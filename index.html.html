@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Strength Training Tracker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    padding: 16px;
+    background-color: #ffffff;
+    color: #000000;
+  }
+  h1 { font-size: 1.4rem; margin-bottom: 8px; }
+  h2 { font-size: 1.1rem; margin-top: 20px; }
+  .card {
+    border: 1px solid #ccc; padding: 12px;
+    border-radius: 8px; margin-bottom: 16px;
+  }
+  label { font-weight: bold; margin-top: 8px; display: block; }
+  input, select, textarea {
+    width: 100%; padding: 8px; margin-bottom: 6px;
+    border-radius: 4px; border: 1px solid #777;
+    font-family: Arial, sans-serif;
+    font-size: 0.95rem;
+    box-sizing: border-box;
+  }
+  textarea {
+    min-height: 90px;
+    resize: vertical;
+  }
+  button {
+    padding: 10px; width: 100%;
+    border: none; border-radius: 4px;
+    background-color: #000; color: #fff;
+    margin-top: 8px; cursor: pointer;
+    font-weight: bold;
+  }
+  button.secondary {
+    background-color: #f2f2f2; color: #000; border: 1px solid #777;
+  }
+  .row-inline {
+    display: flex; gap: 8px;
+  }
+  .row-inline > div {
+    flex: 1;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  th, td { border-bottom: 1px solid #ccc; padding: 4px; text-align: left; }
+  .small-link-button {
+    width: 100%;
+    padding: 8px;
+    font-size: 0.9rem;
+    margin-top: 4px;
+    background-color: #e8e8e8;
+    color: #000;
+    border: 1px solid #aaa;
+  }
+  .diary-entry {
+    font-size: 0.85rem;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #eee;
+  }
+  .diary-date {
+    font-weight: bold;
+  }
+  .diary-notes {
+    margin-top: 4px;
+  }
+  .diary-exercises {
+    margin-top: 4px;
+    font-family: monospace;
+    white-space: pre-wrap;
+  }
+</style>
+</head>
+<body>
+
+<h1>Strength Training Tracker</h1>
+
+<div class="card">
+  <label>Date</label>
+  <input type="date" id="date" />
+
+  <label>Workout Notes (optional)</label>
+  <textarea id="notes" placeholder="How did today go?"></textarea>
+
+  <label>Add Exercise Line (helper)</label>
+  <div class="row-inline">
+    <div>
+      <select id="quickExercise"></select>
+    </div>
+  </div>
+  <input type="text" id="customExercise" placeholder="Custom exercise name" style="display:none;" />
+
+  <button type="button" class="small-link-button" onclick="openYouTubeDemo()">
+    🔗 Open YouTube demo for this exercise
+  </button>
+
+  <div class="row-inline">
+    <div>
+      <input type="text" id="quickWeight" placeholder="Weight (e.g., 40 or BW)" />
+    </div>
+    <div>
+      <input type="text" id="quickReps" placeholder="Reps (e.g., 10 or 8/6/4)" />
+    </div>
+    <div>
+      <input type="text" id="quickSets" placeholder="Sets (e.g., 3)" />
+    </div>
+  </div>
+  <button type="button" class="secondary" onclick="addLine()">Add Line to Workout</button>
+
+  <label>Workout Entries (one per line)<br/><span style="font-weight:normal;">Format: Exercise, Weight, Reps, Sets</span></label>
+  <textarea id="exerciseBlock" placeholder="Goblet Squat, 40, 10, 3
+RDL, 50, 8, 3
+Farmer Carry, 50, 30s, 3"></textarea>
+
+  <button onclick="saveEntry()">Save Workout</button>
+  <button class="secondary" onclick="exportCSV()">Export Set Log CSV</button>
+  <button class="secondary" onclick="exportDiaryCSV()">Export Training Diary CSV</button>
+  <button class="secondary" onclick="clearAll()">Clear All Data</button>
+</div>
+
+<h2>Logged Sets</h2>
+<div class="card" style="max-height:260px; overflow-y:scroll;">
+  <table id="logTable">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Exercise</th>
+        <th>Weight</th>
+        <th>Reps</th>
+        <th>Sets</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<h2>Training Diary</h2>
+<div class="card" id="diaryContainer" style="max-height:260px; overflow-y:scroll;">
+  <!-- Diary entries injected here -->
+</div>
+
+<script>
+const LOG_KEY = "strength_html_log_v4";
+const DIARY_KEY = "strength_html_diary_v1";
+
+// Common exercises for dropdown
+const commonExercises = [
+  "Goblet Squat",
+  "Romanian Deadlift (DB/Kettlebell)",
+  "Step-Ups",
+  "Neutral-Grip Dumbbell Bench Press",
+  "Chest-Supported Row",
+  "Banded Triceps Extensions",
+  "Wrist Extensor Strengthening",
+  "Farmer Carry",
+  "Split Squat",
+  "Deadlift Variation (DB/Kettlebell)",
+  "Hip Hinge Drills",
+  "Dumbbell Shoulder Press (Neutral Grip)",
+  "Single-Arm Dumbbell Row",
+  "Plank",
+  "Side Plank",
+  "Pull-Ups",
+  "Push-Ups"
+];
+
+function initDate() {
+  const dateInput = document.getElementById("date");
+  if (!dateInput.value) {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, "0");
+    const d = String(today.getDate()).padStart(2, "0");
+    dateInput.value = `${y}-${m}-${d}`;
+  }
+}
+
+function initDropdown() {
+  const sel = document.getElementById("quickExercise");
+  sel.innerHTML = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Select exercise";
+  placeholder.disabled = true;
+  placeholder.selected = true;
+  sel.appendChild(placeholder);
+
+  commonExercises.forEach(ex => {
+    const opt = document.createElement("option");
+    opt.value = ex;
+    opt.textContent = ex;
+    sel.appendChild(opt);
+  });
+
+  const otherOpt = document.createElement("option");
+  otherOpt.value = "__other__";
+  otherOpt.textContent = "Other…";
+  sel.appendChild(otherOpt);
+
+  sel.addEventListener("change", () => {
+    const custom = document.getElementById("customExercise");
+    if (sel.value === "__other__") {
+      custom.style.display = "block";
+      custom.focus();
+    } else {
+      custom.style.display = "none";
+    }
+  });
+}
+
+function openYouTubeDemo() {
+  const sel = document.getElementById("quickExercise");
+  const custom = document.getElementById("customExercise");
+  let name = "";
+
+  if (sel.value === "__other__") {
+    name = custom.value.trim();
+  } else {
+    name = sel.value;
+  }
+
+  if (!name) {
+    alert("Select or enter an exercise first.");
+    return;
+  }
+
+  const query = encodeURIComponent(name + " exercise");
+  const url = "https://www.youtube.com/results?search_query=" + query;
+  window.open(url, "_blank");
+}
+
+// ---- Logging helpers ----
+function loadLog() {
+  return JSON.parse(localStorage.getItem(LOG_KEY) || "[]");
+}
+function saveLog(log) {
+  localStorage.setItem(LOG_KEY, JSON.stringify(log));
+}
+function loadDiary() {
+  return JSON.parse(localStorage.getItem(DIARY_KEY) || "[]");
+}
+function saveDiary(diary) {
+  localStorage.setItem(DIARY_KEY, JSON.stringify(diary));
+}
+
+function renderLog() {
+  const log = loadLog();
+  const tbody = document.querySelector("#logTable tbody");
+  tbody.innerHTML = "";
+  log.forEach(row => {
+    let tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${row.date}</td>
+      <td>${row.exercise}</td>
+      <td>${row.weight}</td>
+      <td>${row.reps}</td>
+      <td>${row.sets}</td>
+      <td>${row.notes || ""}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderDiary() {
+  const diary = loadDiary();
+  const container = document.getElementById("diaryContainer");
+  container.innerHTML = "";
+  diary.sort((a, b) => {
+    if (a.date === b.date) {
+      return (a.createdAt || "").localeCompare(b.createdAt || "");
+    }
+    return (a.date || "").localeCompare(b.date || "");
+  });
+  diary.forEach(entry => {
+    const div = document.createElement("div");
+    div.className = "diary-entry";
+    div.innerHTML = `
+      <div class="diary-date">${entry.date}</div>
+      <div class="diary-notes">${entry.notes ? entry.notes.replace(/\n/g, "<br>") : "<em>No notes</em>"}</div>
+      <div class="diary-exercises">${entry.exercises || ""}</div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function addLine() {
+  const sel = document.getElementById("quickExercise");
+  const custom = document.getElementById("customExercise");
+  const weight = document.getElementById("quickWeight").value.trim();
+  const reps = document.getElementById("quickReps").value.trim();
+  const sets = document.getElementById("quickSets").value.trim();
+  const block = document.getElementById("exerciseBlock");
+
+  let exerciseName = "";
+  if (sel.value === "__other__") {
+    exerciseName = custom.value.trim();
+  } else {
+    exerciseName = sel.value;
+  }
+
+  if (!exerciseName) {
+    alert("Select or enter an exercise name.");
+    return;
+  }
+  if (!weight || !reps || !sets) {
+    alert("Enter weight, reps, and sets.");
+    return;
+  }
+
+  const line = `${exerciseName}, ${weight}, ${reps}, ${sets}`;
+  const current = block.value.trim();
+  block.value = current ? current + "\n" + line : line;
+
+  // Clear quick fields except exercise selection
+  document.getElementById("quickWeight").value = "";
+  document.getElementById("quickReps").value = "";
+  document.getElementById("quickSets").value = "";
+  if (sel.value === "__other__") {
+    custom.value = "";
+  }
+}
+
+function saveEntry() {
+  const date = document.getElementById("date").value;
+  const notes = document.getElementById("notes").value;
+  const block = document.getElementById("exerciseBlock").value.trim();
+
+  if (!date || !block) {
+    alert("Date and exercises are required.");
+    return;
+  }
+
+  const lines = block.split("\n");
+  const log = loadLog();
+
+  // Save each line as a separate log row
+  lines.forEach(line => {
+    const parts = line.split(",").map(x => x.trim());
+    if (parts.length >= 4) {
+      log.push({
+        date,
+        exercise: parts[0],
+        weight: parts[1],
+        reps: parts[2],
+        sets: parts[3],
+        notes
+      });
+    }
+  });
+  saveLog(log);
+
+  // Also save one diary entry for the whole workout
+  const diary = loadDiary();
+  diary.push({
+    date,
+    notes,
+    exercises: block,
+    createdAt: new Date().toISOString()
+  });
+  saveDiary(diary);
+
+  renderLog();
+  renderDiary();
+  alert("Workout saved to log and training diary!");
+}
+
+function exportCSV() {
+  const log = loadLog();
+  let csv = "Date,Exercise,Weight,Reps,Sets,Notes\n";
+  log.forEach(r => {
+    const safeNotes = (r.notes || "").replace(/"/g, '""');
+    csv += `${r.date},${r.exercise},${r.weight},${r.reps},${r.sets},"${safeNotes}"\n`;
+  });
+
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "strength_set_log.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportDiaryCSV() {
+  const diary = loadDiary();
+  let csv = "Date,Notes,Exercises\n";
+  diary.forEach(d => {
+    const safeNotes = (d.notes || "").replace(/"/g, '""');
+    const safeExercises = (d.exercises || "").replace(/"/g, '""').replace(/\n/g, " / ");
+    csv += `${d.date},"${safeNotes}","${safeExercises}"\n`;
+  });
+
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "strength_training_diary.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function clearAll() {
+  if (confirm("Clear all logged data and diary entries?")) {
+    localStorage.removeItem(LOG_KEY);
+    localStorage.removeItem(DIARY_KEY);
+    renderLog();
+    renderDiary();
+  }
+}
+
+// Initialize
+initDate();
+initDropdown();
+renderLog();
+renderDiary();
+</script>
+
+</body>
+</html>
