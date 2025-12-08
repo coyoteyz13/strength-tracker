@@ -214,15 +214,9 @@
       gap: 0.5rem;
     }
 
-    .grid-3 {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 0.5rem;
-    }
-
     .exercise-row {
       display: grid;
-      grid-template-columns: minmax(0, 2.5fr) repeat(3, minmax(0, 1fr)) auto;
+      grid-template-columns: minmax(0, 2.8fr) repeat(3, minmax(0, 1fr)) auto;
       gap: 0.45rem;
       align-items: flex-end;
       margin-bottom: 0.5rem;
@@ -316,6 +310,18 @@
       opacity: 0.65;
     }
 
+    .demo-link {
+      font-size: 0.72rem;
+      margin-top: 0.15rem;
+      display: none;
+      text-decoration: none;
+      color: var(--accent);
+    }
+
+    .demo-link span {
+      font-size: 0.78rem;
+    }
+
     @media (max-width: 640px) {
       .app {
         padding: 0.3rem 0.6rem 4.5rem;
@@ -324,7 +330,7 @@
         padding-top: 0.55rem;
       }
       .exercise-row {
-        grid-template-columns: minmax(0, 2.5fr) repeat(3,minmax(0,1fr));
+        grid-template-columns: minmax(0, 1fr) repeat(3,minmax(0,1fr));
         grid-auto-flow: row;
       }
       .exercise-row button.small {
@@ -469,37 +475,71 @@
   </div>
 
   <script>
-    // ========== CONFIG ==========
+    // ===== CONFIG =====
     const STORAGE_KEY = 'strengthWorkouts_v2';
     const DRAFT_KEY = 'strengthDraft_v2';
     const THEME_KEY = 'strengthTheme';
-    // Optional: paste a Google Apps Script web app URL here to POST full workout data
-    // const GOOGLE_SHEETS_WEBAPP_URL = 'https://script.google.com/macros/s/XXX/exec';
-    const GOOGLE_SHEETS_WEBAPP_URL = '';
 
-    // ========== STATE ==========
+    const EXERCISE_OPTIONS = [
+      'Goblet Squat',
+      'Back Squat',
+      'Front Squat',
+      'Romanian Deadlift',
+      'RDL (DB)',
+      'Conventional Deadlift',
+      'Trap Bar Deadlift',
+      'Lunge (Walking)',
+      'Split Squat',
+      'Step-Ups',
+      'Hip Thrust',
+      'Glute Bridge',
+      'Bench Press',
+      'Dumbbell Bench Press',
+      'Neutral-Grip DB Bench',
+      'Incline Bench Press',
+      'Push-Ups',
+      'Pull-Ups',
+      'Lat Pulldown',
+      'Chest-Supported Row',
+      'DB Row',
+      'Seated Cable Row',
+      'Overhead Press',
+      'DB Shoulder Press',
+      'Lateral Raises',
+      'Biceps Curls',
+      'Hammer Curls',
+      'Triceps Pushdowns',
+      'Triceps Extensions',
+      'Farmer Carry',
+      'Plank',
+      'Side Plank',
+      'Dead Bug',
+      'Pallof Press'
+    ];
+
+    // ===== STATE =====
     let workouts = [];
     let currentDetailId = null;
     let exerciseChart = null;
+    const tabOrder = ['log','diary','charts'];
+    let activeTab = 'log';
 
-    // ========== HELPERS ==========
-    function $(id) {
-      return document.getElementById(id);
-    }
+    // ===== HELPERS =====
+    const $ = id => document.getElementById(id);
 
     function todayISO() {
       const d = new Date();
       return d.toISOString().slice(0,10);
     }
 
-    function formatDate(dateStr) {
-      if (!dateStr) return '';
-      const d = new Date(dateStr + 'T00:00:00');
+    function formatDate(dstr) {
+      if (!dstr) return '';
+      const d = new Date(dstr + 'T00:00:00');
       return d.toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' });
     }
 
     function uuid() {
-      return 'w_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+      return 'w_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
     }
 
     function isNumericWeight(val) {
@@ -514,33 +554,27 @@
       exercises.forEach(ex => {
         const w = ex.weight;
         const reps = parseFloat(ex.reps) || 0;
-        const setCount = parseFloat(ex.sets) || 0;
-        sets += setCount;
+        const s = parseFloat(ex.sets) || 0;
+        sets += s;
         if (isNumericWeight(w)) {
-          volume += parseFloat(w) * reps * setCount;
+          volume += parseFloat(w) * reps * s;
         }
       });
       return { volume, sets, exerciseCount: exercises.length };
+    }
+
+    // ===== STORAGE =====
+    function loadWorkouts() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) { workouts = []; return; }
+      try { workouts = JSON.parse(raw) || []; }
+      catch { workouts = []; }
     }
 
     function saveWorkouts() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(workouts));
       populateDiary();
       populateExerciseSelect();
-    }
-
-    function loadWorkouts() {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) {
-        workouts = [];
-        return;
-      }
-      try {
-        workouts = JSON.parse(raw);
-      } catch (e) {
-        console.error('Failed to parse workouts', e);
-        workouts = [];
-      }
     }
 
     function saveDraft() {
@@ -553,38 +587,162 @@
       const raw = localStorage.getItem(DRAFT_KEY);
       if (!raw) return;
       try {
-        const d = JSON.parse(raw);
-        setFormState(d);
+        setFormState(JSON.parse(raw));
         updateTodayStats();
-      } catch(e) {
-        console.error('Failed to parse draft', e);
-      }
+      } catch {}
     }
 
     function clearDraft() {
       localStorage.removeItem(DRAFT_KEY);
-      setFormState({
-        date: todayISO(),
-        notes: '',
-        exercises: []
-      });
+      setFormState({ date: todayISO(), notes: '', exercises: [] });
       updateTodayStats();
     }
 
-    // ========== FORM HANDLING ==========
+    // ===== FORM: EXERCISE ROWS WITH DROPDOWNS + YOUTUBE DEMO =====
+    function createExerciseNameCell(existingName = '') {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <label>Exercise</label>
+        <select class="ex-name-select"></select>
+        <input type="text" class="ex-name-other" placeholder="Type exercise" style="display:none; margin-top:4px;">
+        <a href="#" class="demo-link ex-demo-link" target="_blank"><span>▶ Demo on YouTube</span></a>
+      `;
+      const select = container.querySelector('.ex-name-select');
+      const other = container.querySelector('.ex-name-other');
+      const demo = container.querySelector('.ex-demo-link');
+
+      // Build options
+      const baseOptions = ['','other'];
+      const optSelect = document.createElement('option');
+      optSelect.value = '';
+      optSelect.textContent = 'Select exercise…';
+      select.appendChild(optSelect);
+
+      EXERCISE_OPTIONS.forEach(name => {
+        const o = document.createElement('option');
+        o.value = name;
+        o.textContent = name;
+        select.appendChild(o);
+      });
+
+      const optOther = document.createElement('option');
+      optOther.value = '_other';
+      optOther.textContent = 'Other (type below)';
+      select.appendChild(optOther);
+
+      // Restore existing value
+      if (existingName && EXERCISE_OPTIONS.includes(existingName)) {
+        select.value = existingName;
+        demo.style.display = 'inline-block';
+      } else if (existingName) {
+        select.value = '_other';
+        other.style.display = 'block';
+        other.value = existingName;
+        demo.style.display = 'inline-block';
+      } else {
+        demo.style.display = 'none';
+      }
+
+      // Helpers
+      function getName() {
+        if (select.value === '_other') return other.value.trim();
+        return select.value;
+      }
+
+      function updateDemo() {
+        const name = getName();
+        if (!name) {
+          demo.style.display = 'none';
+          return;
+        }
+        const url = 'https://www.youtube.com/results?search_query=' +
+          encodeURIComponent(name + ' exercise demo');
+        demo.href = url;
+        demo.style.display = 'inline-block';
+      }
+
+      select.addEventListener('change', () => {
+        if (select.value === '_other') {
+          other.style.display = 'block';
+        } else {
+          other.style.display = 'none';
+        }
+        updateDemo();
+        saveDraft();
+      });
+
+      other.addEventListener('input', () => {
+        updateDemo();
+        saveDraft();
+      });
+
+      updateDemo();
+      return container;
+    }
+
+    function addExerciseRow(existing) {
+      const list = $('exerciseList');
+      const row = document.createElement('div');
+      row.className = 'exercise-row';
+      row.dataset.id = existing?.id || uuid();
+
+      // Build columns
+      const nameCell = createExerciseNameCell(existing?.name || '');
+
+      const weightCell = document.createElement('div');
+      weightCell.innerHTML = `
+        <label>Weight</label>
+        <input type="text" class="ex-weight" placeholder="lbs or BW" value="${existing?.weight || ''}">
+      `;
+
+      const repsCell = document.createElement('div');
+      repsCell.innerHTML = `
+        <label>Reps</label>
+        <input type="text" class="ex-reps" placeholder="10 or 8/6/4" value="${existing?.reps || ''}">
+      `;
+
+      const setsCell = document.createElement('div');
+      setsCell.innerHTML = `
+        <label>Sets</label>
+        <input type="number" class="ex-sets" min="1" placeholder="3" value="${existing?.sets || ''}">
+      `;
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'small danger remove-ex';
+      removeBtn.textContent = '✕';
+
+      row.appendChild(nameCell);
+      row.appendChild(weightCell);
+      row.appendChild(repsCell);
+      row.appendChild(setsCell);
+      row.appendChild(removeBtn);
+
+      list.appendChild(row);
+    }
+
+    function getExerciseNameFromRow(row) {
+      const select = row.querySelector('.ex-name-select');
+      const other = row.querySelector('.ex-name-other');
+      if (!select) return '';
+      if (select.value === '_other') {
+        return (other?.value || '').trim();
+      }
+      return select.value;
+    }
+
     function getFormState() {
       const date = $('workoutDate').value || todayISO();
       const notes = $('workoutNotes').value || '';
       const rows = Array.from(document.querySelectorAll('.exercise-row'));
-      const exercises = rows.map(row => {
-        return {
-          id: row.dataset.id,
-          name: row.querySelector('.ex-name').value.trim(),
-          weight: row.querySelector('.ex-weight').value.trim(),
-          reps: row.querySelector('.ex-reps').value.trim(),
-          sets: row.querySelector('.ex-sets').value.trim(),
-        };
-      }).filter(ex => ex.name || ex.weight || ex.reps || ex.sets);
+      const exercises = rows.map(row => ({
+        id: row.dataset.id,
+        name: getExerciseNameFromRow(row),
+        weight: row.querySelector('.ex-weight').value.trim(),
+        reps: row.querySelector('.ex-reps').value.trim(),
+        sets: row.querySelector('.ex-sets').value.trim(),
+      })).filter(ex =>
+        ex.name || ex.weight || ex.reps || ex.sets
+      );
       return { date, notes, exercises };
     }
 
@@ -594,38 +752,7 @@
       const list = $('exerciseList');
       list.innerHTML = '';
       (state.exercises || []).forEach(ex => addExerciseRow(ex));
-      if ((state.exercises || []).length === 0) {
-        addExerciseRow();
-      }
-    }
-
-    function addExerciseRow(existing) {
-      const list = $('exerciseList');
-      const row = document.createElement('div');
-      row.className = 'exercise-row';
-      row.dataset.id = existing?.id || uuid();
-
-      row.innerHTML = `
-        <div>
-          <label>Exercise</label>
-          <input type="text" class="ex-name" placeholder="e.g., Goblet Squat" value="${existing?.name || ''}">
-        </div>
-        <div>
-          <label>Weight</label>
-          <input type="text" class="ex-weight" placeholder="lbs or BW" value="${existing?.weight || ''}">
-        </div>
-        <div>
-          <label>Reps</label>
-          <input type="text" class="ex-reps" placeholder="10 or 8/6/4" value="${existing?.reps || ''}">
-        </div>
-        <div>
-          <label>Sets</label>
-          <input type="number" min="1" class="ex-sets" placeholder="3" value="${existing?.sets || ''}">
-        </div>
-        <button class="small danger remove-ex">✕</button>
-      `;
-
-      list.appendChild(row);
+      if ((state.exercises || []).length === 0) addExerciseRow();
     }
 
     function updateTodayStats() {
@@ -636,11 +763,10 @@
       $('exerciseCountPill').textContent = `Exercises: ${stats.exerciseCount}`;
     }
 
-    // ========== DIARY ==========
+    // ===== DIARY =====
     function populateDiary() {
       const tbody = $('diaryTable').querySelector('tbody');
       tbody.innerHTML = '';
-
       const sorted = [...workouts].sort((a,b) => (a.date > b.date ? -1 : 1));
 
       sorted.forEach(w => {
@@ -652,9 +778,7 @@
           <td>${stats.sets}</td>
           <td>${Math.round(stats.volume)}</td>
           <td>${w.notes || ''}</td>
-          <td>
-            <button class="small ghost view-btn" data-id="${w.id}">View</button>
-          </td>
+          <td><button class="small ghost view-btn" data-id="${w.id}">View</button></td>
         `;
         tbody.appendChild(tr);
       });
@@ -663,15 +787,15 @@
     function showWorkoutDetail(id) {
       const w = workouts.find(x => x.id === id);
       if (!w) return;
-
       currentDetailId = id;
+
       $('detailTitle').textContent = `Workout – ${formatDate(w.date)}`;
       const stats = calcWorkoutStats(w.exercises || []);
-      $('detailSubtitle').textContent = `${(w.exercises || []).length} exercises • ${stats.sets} sets • ${Math.round(stats.volume)} lbs volume`;
+      $('detailSubtitle').textContent =
+        `${(w.exercises || []).length} exercises • ${stats.sets} sets • ${Math.round(stats.volume)} lbs volume`;
 
       const detail = $('detailExercises');
       detail.innerHTML = '';
-
       (w.exercises || []).forEach(ex => {
         const div = document.createElement('div');
         div.className = 'card';
@@ -709,7 +833,7 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    // ========== CHARTS ==========
+    // ===== CHARTS =====
     function populateExerciseSelect() {
       const select = $('exerciseSelect');
       const names = new Set();
@@ -738,15 +862,10 @@
         .forEach(w => {
           const exercises = (w.exercises || []).filter(ex => ex.name === exName);
           const stats = calcWorkoutStats(exercises);
-          points.push({
-            x: w.date,
-            y: Math.round(stats.volume)
-          });
+          points.push({ x: w.date, y: Math.round(stats.volume) });
         });
 
-      if (exerciseChart) {
-        exerciseChart.destroy();
-      }
+      if (exerciseChart) exerciseChart.destroy();
 
       exerciseChart = new Chart(ctx, {
         type: 'line',
@@ -764,38 +883,23 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          animation: {
-            duration: 600,
-            easing: 'easeOutQuart'
-          },
+          animation: { duration: 600, easing: 'easeOutQuart' },
           scales: {
             x: {
               type: 'time',
-              time: {
-                unit: 'day'
-              },
-              ticks: {
-                maxRotation: 0,
-                autoSkip: true
-              }
+              time: { unit: 'day' },
+              ticks: { maxRotation: 0, autoSkip: true }
             },
             y: {
               beginAtZero: true,
-              ticks: {
-                precision: 0
-              }
+              ticks: { precision: 0 }
             }
           },
           plugins: {
-            legend: {
-              display: false
-            },
+            legend: { display: false },
             tooltip: {
               callbacks: {
-                title: (items) => {
-                  const d = items[0].raw.x;
-                  return formatDate(d);
-                },
+                title: (items) => formatDate(items[0].raw.x),
                 label: (item) => `Volume: ${item.raw.y} lbs`
               }
             }
@@ -804,9 +908,9 @@
       });
     }
 
-    // ========== EXPORT (CSV + optional Google Sheets) ==========
+    // ===== EXPORT CSV (Google Sheets–friendly) =====
     function exportCsv() {
-      if (workouts.length === 0) {
+      if (!workouts.length) {
         alert('No workouts to export yet.');
         return;
       }
@@ -825,7 +929,9 @@
           ]);
         });
       });
-      const csv = rows.map(r => r.map(v => `"${(v || '').toString().replace(/"/g,'""')}"`).join(',')).join('\n');
+      const csv = rows
+        .map(r => r.map(v => `"${(v || '').toString().replace(/"/g,'""')}"`).join(','))
+        .join('\n');
       const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -837,27 +943,7 @@
       URL.revokeObjectURL(url);
     }
 
-    async function sendToGoogleSheets() {
-      if (!GOOGLE_SHEETS_WEBAPP_URL) {
-        alert('To enable direct Google Sheets logging, set GOOGLE_SHEETS_WEBAPP_URL in the code to your Apps Script web app URL.');
-        return;
-      }
-      try {
-        const res = await fetch(GOOGLE_SHEETS_WEBAPP_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ workouts })
-        });
-        const text = await res.text();
-        alert('Sync request sent. Response: ' + text);
-      } catch (e) {
-        alert('Failed to send to Google Sheets: ' + e.message);
-      }
-    }
-
-    // ========== TABS + SWIPE ==========
-    const tabOrder = ['log','diary','charts'];
-    let activeTab = 'log';
+    // ===== TABS + SWIPE =====
     function switchTab(name) {
       activeTab = name;
       document.querySelectorAll('.tab').forEach(t => {
@@ -869,19 +955,16 @@
     }
 
     function handleSwipe() {
-      let touchStartX = 0;
-      let touchEndX = 0;
-      const threshold = 50; // px
-
+      let startX = 0;
+      let endX = 0;
+      const threshold = 50;
       document.addEventListener('touchstart', e => {
-        touchStartX = e.changedTouches[0].screenX;
+        startX = e.changedTouches[0].screenX;
       });
-
       document.addEventListener('touchend', e => {
-        touchEndX = e.changedTouches[0].screenX;
-        const diff = touchEndX - touchStartX;
+        endX = e.changedTouches[0].screenX;
+        const diff = endX - startX;
         if (Math.abs(diff) < threshold) return;
-
         const idx = tabOrder.indexOf(activeTab);
         if (diff < 0 && idx < tabOrder.length - 1) {
           switchTab(tabOrder[idx + 1]);
@@ -891,7 +974,7 @@
       });
     }
 
-    // ========== THEME ==========
+    // ===== THEME =====
     function applyTheme(theme) {
       if (theme === 'light') {
         document.body.classList.add('light');
@@ -907,21 +990,21 @@
       applyTheme(stored);
     }
 
-    // ========== INIT ==========
+    // ===== INIT =====
     function init() {
       $('currentDayLabel').textContent = `Today is ${formatDate(todayISO())}`;
       $('workoutDate').value = todayISO();
 
       initTheme();
       loadWorkouts();
-      setFormState({ date: todayISO(), notes:'', exercises: [] });
+      setFormState({ date: todayISO(), notes: '', exercises: [] });
       loadDraft();
       populateDiary();
       populateExerciseSelect();
       handleSwipe();
       updateTodayStats();
 
-      // Events
+      // Header
       $('themeToggle').addEventListener('click', () => {
         const isLight = document.body.classList.toggle('light');
         const theme = isLight ? 'light' : 'dark';
@@ -929,22 +1012,17 @@
         applyTheme(theme);
       });
 
+      $('exportCsvBtn').addEventListener('click', exportCsv);
+
+      // Tabs
       document.querySelectorAll('.tab').forEach(tab => {
         tab.addEventListener('click', () => switchTab(tab.dataset.tab));
       });
 
+      // Log tab events
       $('addExerciseBtn').addEventListener('click', () => {
         addExerciseRow();
         saveDraft();
-      });
-
-      $('exerciseList').addEventListener('input', e => {
-        if (e.target.classList.contains('ex-name') ||
-            e.target.classList.contains('ex-weight') ||
-            e.target.classList.contains('ex-reps') ||
-            e.target.classList.contains('ex-sets')) {
-          saveDraft();
-        }
       });
 
       $('exerciseList').addEventListener('click', e => {
@@ -954,8 +1032,16 @@
         }
       });
 
+      $('exerciseList').addEventListener('input', e => {
+        const cls = e.target.className || '';
+        if (cls.includes('ex-weight') || cls.includes('ex-reps') || cls.includes('ex-sets')) {
+          saveDraft();
+        }
+      });
+
       $('workoutDate').addEventListener('change', saveDraft);
       $('workoutNotes').addEventListener('input', saveDraft);
+
       $('clearDraftBtn').addEventListener('click', () => {
         if (confirm('Clear current draft? This does not delete saved workouts.')) {
           clearDraft();
@@ -983,10 +1069,10 @@
         clearDraft();
       });
 
+      // Diary events
       $('diaryTable').addEventListener('click', e => {
         if (e.target.classList.contains('view-btn')) {
-          const id = e.target.dataset.id;
-          showWorkoutDetail(id);
+          showWorkoutDetail(e.target.dataset.id);
         }
       });
 
@@ -997,6 +1083,7 @@
 
       $('duplicateWorkoutBtn').addEventListener('click', duplicateWorkoutToToday);
 
+      // Charts
       $('exerciseSelect').addEventListener('change', e => {
         const name = e.target.value;
         if (!name) {
@@ -1005,12 +1092,9 @@
         }
         buildExerciseChart(name);
       });
-
-      $('exportCsvBtn').addEventListener('click', exportCsv);
     }
 
     document.addEventListener('DOMContentLoaded', init);
   </script>
 </body>
 </html>
-
