@@ -486,42 +486,104 @@
     const DRAFT_KEY = 'strengthDraft_v2';
     const THEME_KEY = 'strengthTheme';
 
-    const EXERCISE_OPTIONS = [
-      'Goblet Squat',
-      'Back Squat',
-      'Front Squat',
-      'Romanian Deadlift',
-      'RDL (DB)',
-      'Conventional Deadlift',
-      'Trap Bar Deadlift',
-      'Lunge (Walking)',
-      'Split Squat',
-      'Step-Ups',
-      'Hip Thrust',
-      'Glute Bridge',
-      'Bench Press',
-      'Dumbbell Bench Press',
-      'Neutral-Grip DB Bench',
-      'Incline Bench Press',
-      'Push-Ups',
-      'Pull-Ups',
-      'Lat Pulldown',
-      'Chest-Supported Row',
-      'DB Row',
-      'Seated Cable Row',
-      'Overhead Press',
-      'DB Shoulder Press',
-      'Lateral Raises',
-      'Biceps Curls',
-      'Hammer Curls',
-      'Triceps Pushdowns',
-      'Triceps Extensions',
-      'Farmer Carry',
-      'Plank',
-      'Side Plank',
-      'Dead Bug',
-      'Pallof Press'
-    ];
+    // === Exercise categories (Option A: Push / Pull / Legs / Accessory / Core / Other) ===
+const EXERCISE_CATEGORIES = {
+  Push: [
+    "Bench Press",
+    "Incline Dumbbell Bench",
+    "Overhead Press",
+    "Dumbbell Shoulder Press",
+    "Push-ups"
+  ],
+  Pull: [
+    "Pull-ups",
+    "Lat Pulldown",
+    "Barbell Row",
+    "Seated Cable Row",
+    "Face Pull",
+    "Chest-Supported Row",
+    "DB Row"
+  ],
+  Legs: [
+    "Goblet Squat",
+    "Back Squat",
+    "Front Squat",
+    "Romanian Deadlift",
+    "RDL (DB)",
+    "Conventional Deadlift",
+    "Trap Bar Deadlift",
+    "Walking Lunge",
+    "Split Squat",
+    "Step-ups"
+  ],
+  Accessory: [
+    "Biceps Curls",
+    "Hammer Curls",
+    "Triceps Rope Pushdown",
+    "Skullcrushers",
+    "Lateral Raises",
+    "Glute Bridge"
+  ],
+  Core: [
+    "Plank",
+    "Cable Crunch",
+    "Hanging Knee Raise",
+    "Dead Bug"
+  ],
+  Other: []
+};
+
+// Quick lookup: exercise name -> category
+const EXERCISE_TO_CATEGORY = {};
+Object.entries(EXERCISE_CATEGORIES).forEach(([cat, list]) => {
+  list.forEach(name => {
+    EXERCISE_TO_CATEGORY[name] = cat;
+  });
+});
+
+// Build a <select> with grouped options
+function buildExerciseSelect(selectEl, selectedValue = "") {
+  selectEl.innerHTML = "";
+
+  // Placeholder
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.disabled = true;
+  placeholder.textContent = "Select exercise…";
+  if (!selectedValue) placeholder.selected = true;
+  selectEl.appendChild(placeholder);
+
+  // Categories as <optgroup>
+  Object.entries(EXERCISE_CATEGORIES).forEach(([category, exercises]) => {
+    if (!exercises.length) return;
+    const group = document.createElement("optgroup");
+    group.label = category.toUpperCase();
+
+    exercises.forEach(exName => {
+      const opt = document.createElement("option");
+      opt.value = exName;
+      opt.textContent = exName;
+      if (selectedValue === exName) opt.selected = true;
+      group.appendChild(opt);
+    });
+
+    selectEl.appendChild(group);
+  });
+
+  // Custom
+  const customOpt = document.createElement("option");
+  customOpt.value = "__custom";
+  customOpt.textContent = "Other (type your own)";
+  if (selectedValue && !EXERCISE_TO_CATEGORY[selectedValue]) {
+    customOpt.selected = true;
+  }
+  selectEl.appendChild(customOpt);
+}
+
+function getCategoryForExercise(name) {
+  return EXERCISE_TO_CATEGORY[name] || "Other";
+}
+
 
     // ===== STATE =====
     let workouts = [];
