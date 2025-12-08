@@ -1,426 +1,1016 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>Strength Training Tracker</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<style>
-  body {
-    font-family: Arial, sans-serif;
-    padding: 16px;
-    background-color: #ffffff;
-    color: #000000;
-  }
-  h1 { font-size: 1.4rem; margin-bottom: 8px; }
-  h2 { font-size: 1.1rem; margin-top: 20px; }
-  .card {
-    border: 1px solid #ccc; padding: 12px;
-    border-radius: 8px; margin-bottom: 16px;
-  }
-  label { font-weight: bold; margin-top: 8px; display: block; }
-  input, select, textarea {
-    width: 100%; padding: 8px; margin-bottom: 6px;
-    border-radius: 4px; border: 1px solid #777;
-    font-family: Arial, sans-serif;
-    font-size: 0.95rem;
-    box-sizing: border-box;
-  }
-  textarea {
-    min-height: 90px;
-    resize: vertical;
-  }
-  button {
-    padding: 10px; width: 100%;
-    border: none; border-radius: 4px;
-    background-color: #000; color: #fff;
-    margin-top: 8px; cursor: pointer;
-    font-weight: bold;
-  }
-  button.secondary {
-    background-color: #f2f2f2; color: #000; border: 1px solid #777;
-  }
-  .row-inline {
-    display: flex; gap: 8px;
-  }
-  .row-inline > div {
-    flex: 1;
-  }
-  table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-  th, td { border-bottom: 1px solid #ccc; padding: 4px; text-align: left; }
-  .small-link-button {
-    width: 100%;
-    padding: 8px;
-    font-size: 0.9rem;
-    margin-top: 4px;
-    background-color: #e8e8e8;
-    color: #000;
-    border: 1px solid #aaa;
-  }
-  .diary-entry {
-    font-size: 0.85rem;
-    margin-bottom: 8px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid #eee;
-  }
-  .diary-date {
-    font-weight: bold;
-  }
-  .diary-notes {
-    margin-top: 4px;
-  }
-  .diary-exercises {
-    margin-top: 4px;
-    font-family: monospace;
-    white-space: pre-wrap;
-  }
-</style>
+  <meta charset="UTF-8" />
+  <title>Strength Training Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Chart.js for animated progress charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root {
+      --bg: #0f172a;
+      --bg-soft: #111827;
+      --bg-softer: #020617;
+      --card: #1f2937;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #38bdf8;
+      --accent-soft: rgba(56, 189, 248, 0.16);
+      --danger: #f97373;
+      --border: #374151;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    body.light {
+      --bg: #f1f5f9;
+      --bg-soft: #e5e7eb;
+      --bg-softer: #d1d5db;
+      --card: #ffffff;
+      --text: #020617;
+      --muted: #6b7280;
+      --accent: #0ea5e9;
+      --accent-soft: rgba(14, 165, 233, 0.12);
+      --danger: #ef4444;
+      --border: #d1d5db;
+    }
+
+    .app {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0.75rem 0.75rem 5rem;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 0.25rem;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(10px);
+      background: linear-gradient(to bottom, rgba(15,23,42,0.96), rgba(15,23,42,0.75));
+    }
+    body.light header {
+      background: linear-gradient(to bottom, rgba(241,245,249,0.98), rgba(241,245,249,0.8));
+    }
+
+    .title-block h1 {
+      margin: 0;
+      font-size: 1.15rem;
+      letter-spacing: 0.02em;
+    }
+    .title-block span {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .header-buttons {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    button,
+    .pill {
+      border: none;
+      border-radius: 999px;
+      padding: 0.45rem 0.9rem;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      background: var(--accent-soft);
+      color: var(--accent);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: #0b1120;
+    }
+
+    button.small {
+      padding: 0.25rem 0.65rem;
+      font-size: 0.75rem;
+    }
+
+    button.ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    button.danger {
+      background: rgba(248,113,113,0.16);
+      color: var(--danger);
+    }
+
+    button:active {
+      transform: scale(0.97);
+    }
+
+    .tabs {
+      margin-top: 0.4rem;
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.3rem;
+      border-radius: 999px;
+      background: var(--bg-soft);
+      overflow-x: auto;
+    }
+    .tab {
+      flex: 1;
+      text-align: center;
+      padding: 0.4rem 0.25rem;
+      border-radius: 999px;
+      font-size: 0.84rem;
+      cursor: pointer;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .tab.active {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    main {
+      margin-top: 0.75rem;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 1rem;
+      padding: 0.85rem;
+      border: 1px solid var(--border);
+      margin-bottom: 0.75rem;
+      box-shadow: 0 18px 40px rgba(15,23,42,0.7);
+    }
+    body.light .card {
+      box-shadow: 0 10px 30px rgba(15,23,42,0.15);
+    }
+
+    .card h2 {
+      margin: 0 0 0.25rem;
+      font-size: 1rem;
+    }
+
+    .card-subtitle {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 0.15rem;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    input[type="date"],
+    textarea,
+    select {
+      width: 100%;
+      padding: 0.45rem 0.55rem;
+      border-radius: 0.6rem;
+      border: 1px solid var(--border);
+      background: var(--bg-soft);
+      color: var(--text);
+      font-size: 0.86rem;
+    }
+    body.light input,
+    body.light textarea,
+    body.light select {
+      background: #f9fafb;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      outline: 1px solid var(--accent);
+      border-color: var(--accent);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 0.5rem;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.5rem;
+    }
+
+    .exercise-row {
+      display: grid;
+      grid-template-columns: minmax(0, 2.5fr) repeat(3, minmax(0, 1fr)) auto;
+      gap: 0.45rem;
+      align-items: flex-end;
+      margin-bottom: 0.5rem;
+    }
+
+    .exercise-row button.small {
+      white-space: nowrap;
+    }
+
+    .exercise-list-header {
+      font-size: 0.8rem;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.25rem;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    .pill-stat {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.78rem;
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      background: var(--bg-soft);
+      color: var(--muted);
+    }
+
+    .stat-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-top: 0.3rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+
+    th,
+    td {
+      padding: 0.35rem 0.3rem;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+
+    th {
+      font-weight: 600;
+      color: var(--muted);
+      font-size: 0.75rem;
+    }
+
+    tr:hover {
+      background: rgba(15,23,42,0.7);
+    }
+    body.light tr:hover {
+      background: rgba(226,232,240,0.7);
+    }
+
+    .tab-view {
+      display: none;
+      animation: fadeIn 0.25s ease-out;
+    }
+    .tab-view.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .chart-container {
+      position: relative;
+      width: 100%;
+      min-height: 260px;
+    }
+
+    .footer-note {
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-align: center;
+      margin-top: 1rem;
+      opacity: 0.65;
+    }
+
+    @media (max-width: 640px) {
+      .app {
+        padding: 0.3rem 0.6rem 4.5rem;
+      }
+      header {
+        padding-top: 0.55rem;
+      }
+      .exercise-row {
+        grid-template-columns: minmax(0, 2.5fr) repeat(3,minmax(0,1fr));
+        grid-auto-flow: row;
+      }
+      .exercise-row button.small {
+        grid-column: 1 / -1;
+        justify-self: flex-start;
+      }
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
+
 <body>
+  <div class="app" id="app">
+    <header>
+      <div class="title-block">
+        <h1>Strength Training Tracker</h1>
+        <span id="currentDayLabel"></span>
+      </div>
+      <div class="header-buttons">
+        <button class="ghost small" id="themeToggle">🌙 Dark</button>
+        <button class="ghost small" id="exportCsvBtn">⬇ CSV</button>
+      </div>
+    </header>
 
-<h1>Strength Training Tracker</h1>
+    <div class="tabs" id="tabs">
+      <div class="tab active" data-tab="log">Log Workout</div>
+      <div class="tab" data-tab="diary">Training Diary</div>
+      <div class="tab" data-tab="charts">Progress Charts</div>
+    </div>
 
-<div class="card">
-  <label>Date</label>
-  <input type="date" id="date" />
+    <main id="views">
+      <!-- LOG TAB -->
+      <section class="tab-view active" id="view-log">
+        <div class="card">
+          <h2>Today’s Workout</h2>
+          <div class="card-subtitle">
+            Log your sets once per workout. Your entries auto-save.
+          </div>
 
-  <label>Workout Notes (optional)</label>
-  <textarea id="notes" placeholder="How did today go?"></textarea>
+          <div class="grid-2" style="margin-bottom:0.5rem;">
+            <div>
+              <label for="workoutDate">Date</label>
+              <input type="date" id="workoutDate" />
+            </div>
+            <div>
+              <label for="workoutNotes">Overall Notes</label>
+              <input type="text" id="workoutNotes" placeholder="Felt good, RPE 7, etc." />
+            </div>
+          </div>
 
-  <label>Add Exercise Line (helper)</label>
-  <div class="row-inline">
-    <div>
-      <select id="quickExercise"></select>
+          <div class="exercise-list-header">
+            <span>Exercises</span>
+            <button class="small ghost" id="addExerciseBtn">+ Add Exercise</button>
+          </div>
+
+          <div id="exerciseList"></div>
+
+          <div class="stat-row" id="todayStats">
+            <span class="pill-stat" id="totalVolumePill">Total Volume: 0 lbs</span>
+            <span class="pill-stat" id="setCountPill">Sets: 0</span>
+            <span class="pill-stat" id="exerciseCountPill">Exercises: 0</span>
+          </div>
+
+          <div style="margin-top:0.7rem; display:flex; justify-content:space-between; gap:0.5rem; flex-wrap:wrap;">
+            <button class="primary" id="saveWorkoutBtn">💾 Save Workout</button>
+            <button class="ghost" id="clearDraftBtn">🧹 Clear Draft</button>
+          </div>
+
+          <div class="muted" style="margin-top:0.4rem;">
+            Draft auto-saves locally as you type. Saved workouts appear in the Training Diary.
+          </div>
+        </div>
+      </section>
+
+      <!-- DIARY TAB -->
+      <section class="tab-view" id="view-diary">
+        <div class="card">
+          <h2>Training Diary</h2>
+          <div class="card-subtitle">
+            Tap a day to view details or duplicate it into a new workout.
+          </div>
+
+          <div id="diaryTableWrapper" style="overflow-x:auto;">
+            <table id="diaryTable">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Exercises</th>
+                  <th>Sets</th>
+                  <th>Volume (lbs)</th>
+                  <th>Notes</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" id="detailCard" style="display:none;">
+          <h2 id="detailTitle">Workout Details</h2>
+          <div class="card-subtitle" id="detailSubtitle"></div>
+          <div id="detailExercises"></div>
+          <div style="margin-top:0.6rem;">
+            <button class="small primary" id="duplicateWorkoutBtn">📋 Duplicate to Today</button>
+            <button class="small ghost" id="closeDetailBtn">Close</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- CHARTS TAB -->
+      <section class="tab-view" id="view-charts">
+        <div class="card">
+          <h2>Per-Exercise Progress</h2>
+          <div class="card-subtitle">
+            Select an exercise to see total volume over time. Charts animate automatically.
+          </div>
+
+          <div style="margin-bottom:0.5rem;">
+            <label for="exerciseSelect">Exercise</label>
+            <select id="exerciseSelect">
+              <option value="">Select exercise…</option>
+            </select>
+          </div>
+
+          <div class="chart-container">
+            <canvas id="exerciseChart"></canvas>
+          </div>
+
+          <div class="muted" style="margin-top:0.5rem;">
+            Volume = weight × reps × sets per workout. Bodyweight (BW) sets don’t add load.
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div class="footer-note">
+      Data is stored locally in this browser using localStorage. To back it up, use CSV export and upload to Google Sheets.
     </div>
   </div>
-  <input type="text" id="customExercise" placeholder="Custom exercise name" style="display:none;" />
 
-  <button type="button" class="small-link-button" onclick="openYouTubeDemo()">
-    🔗 Open YouTube demo for this exercise
-  </button>
+  <script>
+    // ========== CONFIG ==========
+    const STORAGE_KEY = 'strengthWorkouts_v2';
+    const DRAFT_KEY = 'strengthDraft_v2';
+    const THEME_KEY = 'strengthTheme';
+    // Optional: paste a Google Apps Script web app URL here to POST full workout data
+    // const GOOGLE_SHEETS_WEBAPP_URL = 'https://script.google.com/macros/s/XXX/exec';
+    const GOOGLE_SHEETS_WEBAPP_URL = '';
 
-  <div class="row-inline">
-    <div>
-      <input type="text" id="quickWeight" placeholder="Weight (e.g., 40 or BW)" />
-    </div>
-    <div>
-      <input type="text" id="quickReps" placeholder="Reps (e.g., 10 or 8/6/4)" />
-    </div>
-    <div>
-      <input type="text" id="quickSets" placeholder="Sets (e.g., 3)" />
-    </div>
-  </div>
-  <button type="button" class="secondary" onclick="addLine()">Add Line to Workout</button>
+    // ========== STATE ==========
+    let workouts = [];
+    let currentDetailId = null;
+    let exerciseChart = null;
 
-  <label>Workout Entries (one per line)<br/><span style="font-weight:normal;">Format: Exercise, Weight, Reps, Sets</span></label>
-  <textarea id="exerciseBlock" placeholder="Goblet Squat, 40, 10, 3
-RDL, 50, 8, 3
-Farmer Carry, 50, 30s, 3"></textarea>
-
-  <button onclick="saveEntry()">Save Workout</button>
-  <button class="secondary" onclick="exportCSV()">Export Set Log CSV</button>
-  <button class="secondary" onclick="exportDiaryCSV()">Export Training Diary CSV</button>
-  <button class="secondary" onclick="clearAll()">Clear All Data</button>
-</div>
-
-<h2>Logged Sets</h2>
-<div class="card" style="max-height:260px; overflow-y:scroll;">
-  <table id="logTable">
-    <thead>
-      <tr>
-        <th>Date</th>
-        <th>Exercise</th>
-        <th>Weight</th>
-        <th>Reps</th>
-        <th>Sets</th>
-        <th>Notes</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-</div>
-
-<h2>Training Diary</h2>
-<div class="card" id="diaryContainer" style="max-height:260px; overflow-y:scroll;">
-  <!-- Diary entries injected here -->
-</div>
-
-<script>
-const LOG_KEY = "strength_html_log_v4";
-const DIARY_KEY = "strength_html_diary_v1";
-
-// Common exercises for dropdown
-const commonExercises = [
-  "Goblet Squat",
-  "Romanian Deadlift (DB/Kettlebell)",
-  "Step-Ups",
-  "Neutral-Grip Dumbbell Bench Press",
-  "Chest-Supported Row",
-  "Banded Triceps Extensions",
-  "Wrist Extensor Strengthening",
-  "Farmer Carry",
-  "Split Squat",
-  "Deadlift Variation (DB/Kettlebell)",
-  "Hip Hinge Drills",
-  "Dumbbell Shoulder Press (Neutral Grip)",
-  "Single-Arm Dumbbell Row",
-  "Plank",
-  "Side Plank",
-  "Pull-Ups",
-  "Push-Ups"
-];
-
-function initDate() {
-  const dateInput = document.getElementById("date");
-  if (!dateInput.value) {
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, "0");
-    const d = String(today.getDate()).padStart(2, "0");
-    dateInput.value = `${y}-${m}-${d}`;
-  }
-}
-
-function initDropdown() {
-  const sel = document.getElementById("quickExercise");
-  sel.innerHTML = "";
-  const placeholder = document.createElement("option");
-  placeholder.value = "";
-  placeholder.textContent = "Select exercise";
-  placeholder.disabled = true;
-  placeholder.selected = true;
-  sel.appendChild(placeholder);
-
-  commonExercises.forEach(ex => {
-    const opt = document.createElement("option");
-    opt.value = ex;
-    opt.textContent = ex;
-    sel.appendChild(opt);
-  });
-
-  const otherOpt = document.createElement("option");
-  otherOpt.value = "__other__";
-  otherOpt.textContent = "Other…";
-  sel.appendChild(otherOpt);
-
-  sel.addEventListener("change", () => {
-    const custom = document.getElementById("customExercise");
-    if (sel.value === "__other__") {
-      custom.style.display = "block";
-      custom.focus();
-    } else {
-      custom.style.display = "none";
+    // ========== HELPERS ==========
+    function $(id) {
+      return document.getElementById(id);
     }
-  });
-}
 
-function openYouTubeDemo() {
-  const sel = document.getElementById("quickExercise");
-  const custom = document.getElementById("customExercise");
-  let name = "";
-
-  if (sel.value === "__other__") {
-    name = custom.value.trim();
-  } else {
-    name = sel.value;
-  }
-
-  if (!name) {
-    alert("Select or enter an exercise first.");
-    return;
-  }
-
-  const query = encodeURIComponent(name + " exercise");
-  const url = "https://www.youtube.com/results?search_query=" + query;
-  window.open(url, "_blank");
-}
-
-// ---- Logging helpers ----
-function loadLog() {
-  return JSON.parse(localStorage.getItem(LOG_KEY) || "[]");
-}
-function saveLog(log) {
-  localStorage.setItem(LOG_KEY, JSON.stringify(log));
-}
-function loadDiary() {
-  return JSON.parse(localStorage.getItem(DIARY_KEY) || "[]");
-}
-function saveDiary(diary) {
-  localStorage.setItem(DIARY_KEY, JSON.stringify(diary));
-}
-
-function renderLog() {
-  const log = loadLog();
-  const tbody = document.querySelector("#logTable tbody");
-  tbody.innerHTML = "";
-  log.forEach(row => {
-    let tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${row.date}</td>
-      <td>${row.exercise}</td>
-      <td>${row.weight}</td>
-      <td>${row.reps}</td>
-      <td>${row.sets}</td>
-      <td>${row.notes || ""}</td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
-
-function renderDiary() {
-  const diary = loadDiary();
-  const container = document.getElementById("diaryContainer");
-  container.innerHTML = "";
-  diary.sort((a, b) => {
-    if (a.date === b.date) {
-      return (a.createdAt || "").localeCompare(b.createdAt || "");
+    function todayISO() {
+      const d = new Date();
+      return d.toISOString().slice(0,10);
     }
-    return (a.date || "").localeCompare(b.date || "");
-  });
-  diary.forEach(entry => {
-    const div = document.createElement("div");
-    div.className = "diary-entry";
-    div.innerHTML = `
-      <div class="diary-date">${entry.date}</div>
-      <div class="diary-notes">${entry.notes ? entry.notes.replace(/\n/g, "<br>") : "<em>No notes</em>"}</div>
-      <div class="diary-exercises">${entry.exercises || ""}</div>
-    `;
-    container.appendChild(div);
-  });
-}
 
-function addLine() {
-  const sel = document.getElementById("quickExercise");
-  const custom = document.getElementById("customExercise");
-  const weight = document.getElementById("quickWeight").value.trim();
-  const reps = document.getElementById("quickReps").value.trim();
-  const sets = document.getElementById("quickSets").value.trim();
-  const block = document.getElementById("exerciseBlock");
+    function formatDate(dateStr) {
+      if (!dateStr) return '';
+      const d = new Date(dateStr + 'T00:00:00');
+      return d.toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' });
+    }
 
-  let exerciseName = "";
-  if (sel.value === "__other__") {
-    exerciseName = custom.value.trim();
-  } else {
-    exerciseName = sel.value;
-  }
+    function uuid() {
+      return 'w_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+    }
 
-  if (!exerciseName) {
-    alert("Select or enter an exercise name.");
-    return;
-  }
-  if (!weight || !reps || !sets) {
-    alert("Enter weight, reps, and sets.");
-    return;
-  }
+    function isNumericWeight(val) {
+      if (!val) return false;
+      if (val.toLowerCase() === 'bw') return false;
+      return !isNaN(parseFloat(val));
+    }
 
-  const line = `${exerciseName}, ${weight}, ${reps}, ${sets}`;
-  const current = block.value.trim();
-  block.value = current ? current + "\n" + line : line;
+    function calcWorkoutStats(exercises) {
+      let volume = 0;
+      let sets = 0;
+      exercises.forEach(ex => {
+        const w = ex.weight;
+        const reps = parseFloat(ex.reps) || 0;
+        const setCount = parseFloat(ex.sets) || 0;
+        sets += setCount;
+        if (isNumericWeight(w)) {
+          volume += parseFloat(w) * reps * setCount;
+        }
+      });
+      return { volume, sets, exerciseCount: exercises.length };
+    }
 
-  // Clear quick fields except exercise selection
-  document.getElementById("quickWeight").value = "";
-  document.getElementById("quickReps").value = "";
-  document.getElementById("quickSets").value = "";
-  if (sel.value === "__other__") {
-    custom.value = "";
-  }
-}
+    function saveWorkouts() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(workouts));
+      populateDiary();
+      populateExerciseSelect();
+    }
 
-function saveEntry() {
-  const date = document.getElementById("date").value;
-  const notes = document.getElementById("notes").value;
-  const block = document.getElementById("exerciseBlock").value.trim();
+    function loadWorkouts() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) {
+        workouts = [];
+        return;
+      }
+      try {
+        workouts = JSON.parse(raw);
+      } catch (e) {
+        console.error('Failed to parse workouts', e);
+        workouts = [];
+      }
+    }
 
-  if (!date || !block) {
-    alert("Date and exercises are required.");
-    return;
-  }
+    function saveDraft() {
+      const draft = getFormState();
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      updateTodayStats();
+    }
 
-  const lines = block.split("\n");
-  const log = loadLog();
+    function loadDraft() {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      try {
+        const d = JSON.parse(raw);
+        setFormState(d);
+        updateTodayStats();
+      } catch(e) {
+        console.error('Failed to parse draft', e);
+      }
+    }
 
-  // Save each line as a separate log row
-  lines.forEach(line => {
-    const parts = line.split(",").map(x => x.trim());
-    if (parts.length >= 4) {
-      log.push({
-        date,
-        exercise: parts[0],
-        weight: parts[1],
-        reps: parts[2],
-        sets: parts[3],
-        notes
+    function clearDraft() {
+      localStorage.removeItem(DRAFT_KEY);
+      setFormState({
+        date: todayISO(),
+        notes: '',
+        exercises: []
+      });
+      updateTodayStats();
+    }
+
+    // ========== FORM HANDLING ==========
+    function getFormState() {
+      const date = $('workoutDate').value || todayISO();
+      const notes = $('workoutNotes').value || '';
+      const rows = Array.from(document.querySelectorAll('.exercise-row'));
+      const exercises = rows.map(row => {
+        return {
+          id: row.dataset.id,
+          name: row.querySelector('.ex-name').value.trim(),
+          weight: row.querySelector('.ex-weight').value.trim(),
+          reps: row.querySelector('.ex-reps').value.trim(),
+          sets: row.querySelector('.ex-sets').value.trim(),
+        };
+      }).filter(ex => ex.name || ex.weight || ex.reps || ex.sets);
+      return { date, notes, exercises };
+    }
+
+    function setFormState(state) {
+      $('workoutDate').value = state.date || todayISO();
+      $('workoutNotes').value = state.notes || '';
+      const list = $('exerciseList');
+      list.innerHTML = '';
+      (state.exercises || []).forEach(ex => addExerciseRow(ex));
+      if ((state.exercises || []).length === 0) {
+        addExerciseRow();
+      }
+    }
+
+    function addExerciseRow(existing) {
+      const list = $('exerciseList');
+      const row = document.createElement('div');
+      row.className = 'exercise-row';
+      row.dataset.id = existing?.id || uuid();
+
+      row.innerHTML = `
+        <div>
+          <label>Exercise</label>
+          <input type="text" class="ex-name" placeholder="e.g., Goblet Squat" value="${existing?.name || ''}">
+        </div>
+        <div>
+          <label>Weight</label>
+          <input type="text" class="ex-weight" placeholder="lbs or BW" value="${existing?.weight || ''}">
+        </div>
+        <div>
+          <label>Reps</label>
+          <input type="text" class="ex-reps" placeholder="10 or 8/6/4" value="${existing?.reps || ''}">
+        </div>
+        <div>
+          <label>Sets</label>
+          <input type="number" min="1" class="ex-sets" placeholder="3" value="${existing?.sets || ''}">
+        </div>
+        <button class="small danger remove-ex">✕</button>
+      `;
+
+      list.appendChild(row);
+    }
+
+    function updateTodayStats() {
+      const { exercises } = getFormState();
+      const stats = calcWorkoutStats(exercises);
+      $('totalVolumePill').textContent = `Total Volume: ${Math.round(stats.volume)} lbs`;
+      $('setCountPill').textContent = `Sets: ${stats.sets}`;
+      $('exerciseCountPill').textContent = `Exercises: ${stats.exerciseCount}`;
+    }
+
+    // ========== DIARY ==========
+    function populateDiary() {
+      const tbody = $('diaryTable').querySelector('tbody');
+      tbody.innerHTML = '';
+
+      const sorted = [...workouts].sort((a,b) => (a.date > b.date ? -1 : 1));
+
+      sorted.forEach(w => {
+        const stats = calcWorkoutStats(w.exercises || []);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${formatDate(w.date)}</td>
+          <td>${(w.exercises || []).length}</td>
+          <td>${stats.sets}</td>
+          <td>${Math.round(stats.volume)}</td>
+          <td>${w.notes || ''}</td>
+          <td>
+            <button class="small ghost view-btn" data-id="${w.id}">View</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
       });
     }
-  });
-  saveLog(log);
 
-  // Also save one diary entry for the whole workout
-  const diary = loadDiary();
-  diary.push({
-    date,
-    notes,
-    exercises: block,
-    createdAt: new Date().toISOString()
-  });
-  saveDiary(diary);
+    function showWorkoutDetail(id) {
+      const w = workouts.find(x => x.id === id);
+      if (!w) return;
 
-  renderLog();
-  renderDiary();
-  alert("Workout saved to log and training diary!");
-}
+      currentDetailId = id;
+      $('detailTitle').textContent = `Workout – ${formatDate(w.date)}`;
+      const stats = calcWorkoutStats(w.exercises || []);
+      $('detailSubtitle').textContent = `${(w.exercises || []).length} exercises • ${stats.sets} sets • ${Math.round(stats.volume)} lbs volume`;
 
-function exportCSV() {
-  const log = loadLog();
-  let csv = "Date,Exercise,Weight,Reps,Sets,Notes\n";
-  log.forEach(r => {
-    const safeNotes = (r.notes || "").replace(/"/g, '""');
-    csv += `${r.date},${r.exercise},${r.weight},${r.reps},${r.sets},"${safeNotes}"\n`;
-  });
+      const detail = $('detailExercises');
+      detail.innerHTML = '';
 
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
+      (w.exercises || []).forEach(ex => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.style.margin = '0.35rem 0';
+        div.innerHTML = `
+          <strong>${ex.name || '(unnamed exercise)'}</strong>
+          <div class="muted">
+            Weight: ${ex.weight || '-'} • Reps: ${ex.reps || '-'} • Sets: ${ex.sets || '-'}
+          </div>
+        `;
+        detail.appendChild(div);
+      });
 
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "strength_set_log.csv";
-  a.click();
-  URL.revokeObjectURL(url);
-}
+      $('detailCard').style.display = 'block';
+    }
 
-function exportDiaryCSV() {
-  const diary = loadDiary();
-  let csv = "Date,Notes,Exercises\n";
-  diary.forEach(d => {
-    const safeNotes = (d.notes || "").replace(/"/g, '""');
-    const safeExercises = (d.exercises || "").replace(/"/g, '""').replace(/\n/g, " / ");
-    csv += `${d.date},"${safeNotes}","${safeExercises}"\n`;
-  });
+    function duplicateWorkoutToToday() {
+      if (!currentDetailId) return;
+      const w = workouts.find(x => x.id === currentDetailId);
+      if (!w) return;
+      const copy = {
+        date: todayISO(),
+        notes: w.notes,
+        exercises: (w.exercises || []).map(ex => ({
+          id: uuid(),
+          name: ex.name,
+          weight: ex.weight,
+          reps: ex.reps,
+          sets: ex.sets,
+        }))
+      };
+      setFormState(copy);
+      saveDraft();
+      switchTab('log');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
 
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
+    // ========== CHARTS ==========
+    function populateExerciseSelect() {
+      const select = $('exerciseSelect');
+      const names = new Set();
+      workouts.forEach(w => (w.exercises || []).forEach(ex => {
+        const name = ex.name?.trim();
+        if (name) names.add(name);
+      }));
+      const current = select.value;
+      select.innerHTML = '<option value="">Select exercise…</option>';
+      Array.from(names).sort().forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        select.appendChild(opt);
+      });
+      if (names.has(current)) select.value = current;
+    }
 
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "strength_training_diary.csv";
-  a.click();
-  URL.revokeObjectURL(url);
-}
+    function buildExerciseChart(exName) {
+      const ctx = $('exerciseChart').getContext('2d');
+      const points = [];
 
-function clearAll() {
-  if (confirm("Clear all logged data and diary entries?")) {
-    localStorage.removeItem(LOG_KEY);
-    localStorage.removeItem(DIARY_KEY);
-    renderLog();
-    renderDiary();
-  }
-}
+      workouts
+        .filter(w => (w.exercises || []).some(ex => ex.name === exName))
+        .sort((a,b) => (a.date > b.date ? 1 : -1))
+        .forEach(w => {
+          const exercises = (w.exercises || []).filter(ex => ex.name === exName);
+          const stats = calcWorkoutStats(exercises);
+          points.push({
+            x: w.date,
+            y: Math.round(stats.volume)
+          });
+        });
 
-// Initialize
-initDate();
-initDropdown();
-renderLog();
-renderDiary();
-</script>
+      if (exerciseChart) {
+        exerciseChart.destroy();
+      }
 
+      exerciseChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          datasets: [{
+            label: `${exName} – Volume per workout`,
+            data: points,
+            tension: 0.25,
+            fill: true,
+            borderColor: '#38bdf8',
+            backgroundColor: 'rgba(56,189,248,0.18)',
+            pointRadius: 3,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: {
+            duration: 600,
+            easing: 'easeOutQuart'
+          },
+          scales: {
+            x: {
+              type: 'time',
+              time: {
+                unit: 'day'
+              },
+              ticks: {
+                maxRotation: 0,
+                autoSkip: true
+              }
+            },
+            y: {
+              beginAtZero: true,
+              ticks: {
+                precision: 0
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              callbacks: {
+                title: (items) => {
+                  const d = items[0].raw.x;
+                  return formatDate(d);
+                },
+                label: (item) => `Volume: ${item.raw.y} lbs`
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // ========== EXPORT (CSV + optional Google Sheets) ==========
+    function exportCsv() {
+      if (workouts.length === 0) {
+        alert('No workouts to export yet.');
+        return;
+      }
+      const rows = [['Date','WorkoutId','Exercise','Weight','Reps','Sets','Notes']];
+      workouts.forEach(w => {
+        const wid = w.id;
+        (w.exercises || []).forEach(ex => {
+          rows.push([
+            w.date,
+            wid,
+            ex.name || '',
+            ex.weight || '',
+            ex.reps || '',
+            ex.sets || '',
+            w.notes || ''
+          ]);
+        });
+      });
+      const csv = rows.map(r => r.map(v => `"${(v || '').toString().replace(/"/g,'""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'strength_training_log.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    async function sendToGoogleSheets() {
+      if (!GOOGLE_SHEETS_WEBAPP_URL) {
+        alert('To enable direct Google Sheets logging, set GOOGLE_SHEETS_WEBAPP_URL in the code to your Apps Script web app URL.');
+        return;
+      }
+      try {
+        const res = await fetch(GOOGLE_SHEETS_WEBAPP_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ workouts })
+        });
+        const text = await res.text();
+        alert('Sync request sent. Response: ' + text);
+      } catch (e) {
+        alert('Failed to send to Google Sheets: ' + e.message);
+      }
+    }
+
+    // ========== TABS + SWIPE ==========
+    const tabOrder = ['log','diary','charts'];
+    let activeTab = 'log';
+    function switchTab(name) {
+      activeTab = name;
+      document.querySelectorAll('.tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.tab === name);
+      });
+      document.querySelectorAll('.tab-view').forEach(v => {
+        v.classList.toggle('active', v.id === 'view-' + name);
+      });
+    }
+
+    function handleSwipe() {
+      let touchStartX = 0;
+      let touchEndX = 0;
+      const threshold = 50; // px
+
+      document.addEventListener('touchstart', e => {
+        touchStartX = e.changedTouches[0].screenX;
+      });
+
+      document.addEventListener('touchend', e => {
+        touchEndX = e.changedTouches[0].screenX;
+        const diff = touchEndX - touchStartX;
+        if (Math.abs(diff) < threshold) return;
+
+        const idx = tabOrder.indexOf(activeTab);
+        if (diff < 0 && idx < tabOrder.length - 1) {
+          switchTab(tabOrder[idx + 1]);
+        } else if (diff > 0 && idx > 0) {
+          switchTab(tabOrder[idx - 1]);
+        }
+      });
+    }
+
+    // ========== THEME ==========
+    function applyTheme(theme) {
+      if (theme === 'light') {
+        document.body.classList.add('light');
+        $('themeToggle').textContent = '☀ Light';
+      } else {
+        document.body.classList.remove('light');
+        $('themeToggle').textContent = '🌙 Dark';
+      }
+    }
+
+    function initTheme() {
+      const stored = localStorage.getItem(THEME_KEY) || 'dark';
+      applyTheme(stored);
+    }
+
+    // ========== INIT ==========
+    function init() {
+      $('currentDayLabel').textContent = `Today is ${formatDate(todayISO())}`;
+      $('workoutDate').value = todayISO();
+
+      initTheme();
+      loadWorkouts();
+      setFormState({ date: todayISO(), notes:'', exercises: [] });
+      loadDraft();
+      populateDiary();
+      populateExerciseSelect();
+      handleSwipe();
+      updateTodayStats();
+
+      // Events
+      $('themeToggle').addEventListener('click', () => {
+        const isLight = document.body.classList.toggle('light');
+        const theme = isLight ? 'light' : 'dark';
+        localStorage.setItem(THEME_KEY, theme);
+        applyTheme(theme);
+      });
+
+      document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+      });
+
+      $('addExerciseBtn').addEventListener('click', () => {
+        addExerciseRow();
+        saveDraft();
+      });
+
+      $('exerciseList').addEventListener('input', e => {
+        if (e.target.classList.contains('ex-name') ||
+            e.target.classList.contains('ex-weight') ||
+            e.target.classList.contains('ex-reps') ||
+            e.target.classList.contains('ex-sets')) {
+          saveDraft();
+        }
+      });
+
+      $('exerciseList').addEventListener('click', e => {
+        if (e.target.classList.contains('remove-ex')) {
+          e.target.closest('.exercise-row').remove();
+          saveDraft();
+        }
+      });
+
+      $('workoutDate').addEventListener('change', saveDraft);
+      $('workoutNotes').addEventListener('input', saveDraft);
+      $('clearDraftBtn').addEventListener('click', () => {
+        if (confirm('Clear current draft? This does not delete saved workouts.')) {
+          clearDraft();
+        }
+      });
+
+      $('saveWorkoutBtn').addEventListener('click', () => {
+        const { date, notes, exercises } = getFormState();
+        if (!exercises.length) {
+          alert('Add at least one exercise before saving.');
+          return;
+        }
+        const stats = calcWorkoutStats(exercises);
+        const workout = {
+          id: uuid(),
+          date,
+          notes,
+          exercises,
+          stats,
+          savedAt: new Date().toISOString()
+        };
+        workouts.push(workout);
+        saveWorkouts();
+        alert('Workout saved.');
+        clearDraft();
+      });
+
+      $('diaryTable').addEventListener('click', e => {
+        if (e.target.classList.contains('view-btn')) {
+          const id = e.target.dataset.id;
+          showWorkoutDetail(id);
+        }
+      });
+
+      $('closeDetailBtn').addEventListener('click', () => {
+        $('detailCard').style.display = 'none';
+        currentDetailId = null;
+      });
+
+      $('duplicateWorkoutBtn').addEventListener('click', duplicateWorkoutToToday);
+
+      $('exerciseSelect').addEventListener('change', e => {
+        const name = e.target.value;
+        if (!name) {
+          if (exerciseChart) exerciseChart.destroy();
+          return;
+        }
+        buildExerciseChart(name);
+      });
+
+      $('exportCsvBtn').addEventListener('click', exportCsv);
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
 </body>
 </html>
+
