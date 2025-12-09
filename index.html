@@ -481,6 +481,9 @@
   </div>
 
   <script>
+    // Google Sheets Auto Sync Endpoint
+    const SHEETS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxnqFJ4Bdv7fhXILhpms7N1x7QH5lGzsf4krvUMtK0JopJjAXUxSZ0PWOXNRW-VvGI/exec";
+    
     // ===== CONFIG =====
     const STORAGE_KEY = 'strengthWorkouts_v2';
     const DRAFT_KEY = 'strengthDraft_v2';
@@ -564,6 +567,68 @@
       });
       return { volume, sets, exerciseCount: exercises.length };
     }
+// ===== GOOGLE SHEETS AUTO SYNC =====
+
+const SHEETS_WEBHOOK_URL =
+  "https://script.google.com/macros/s/AKfycbxnqFJ4Bdv7fhXlLhpms7N1x7QH5IGzs4fkrvUMtK0JopJjAXUxSZ0PW0XNRW-VvGI/exec";
+
+function collectWorkoutForSheets() {
+  const dateInput = $('#date');
+  const notesInput = $('#workoutNotes');
+
+  const date = dateInput ? dateInput.value : '';
+  const notes = notesInput ? notesInput.value.trim() : '';
+
+  const rows = Array.from(document.querySelectorAll('#exerciseRows .exercise-row'));
+
+  const exercises = rows
+    .map((row) => {
+      const nameSel = row.querySelector('.exercise-select');
+      const name = nameSel ? nameSel.value : '';
+      if (!name) return null;
+
+      const weightStr = (row.querySelector('.exercise-weight')?.value || '').trim();
+      const repsStr   = (row.querySelector('.exercise-reps')?.value || '').trim();
+      const setsStr   = (row.querySelector('.exercise-sets')?.value || '').trim();
+
+      const weightNum = parseFloat(weightStr) || 0;
+      const repsNum   = parseFloat(repsStr.split(/[^\d.]+/)[0]) || 0;
+      const setsNum   = parseInt(setsStr || '0', 10) || 0;
+      const volume    = weightNum * repsNum * setsNum;
+
+      return { name, weight: weightStr, reps: repsStr, sets: setsNum, volume };
+    })
+    .filter(Boolean);
+
+  return { date, notes, exercises };
+}
+
+async function uploadWorkoutToSheetsAuto() {
+  if (!SHEETS_WEBHOOK_URL) return;
+
+  const payload = collectWorkoutForSheets();
+  if (!payload.date || !payload.exercises.length) {
+    console.log('Sheets upload skipped (empty workout).');
+    return;
+  }
+
+  try {
+    const res = await fetch(SHEETS_WEBHOOK_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (!res.ok) {
+      console.error('Sheets upload failed:', await res.text());
+      return;
+    }
+
+    console.log('Workout auto-synced to Google Sheets ✔️');
+  } catch (err) {
+    console.error('Sheets upload error:', err);
+  }
+}
 
     // ===== STORAGE =====
     function loadWorkouts() {
@@ -1052,26 +1117,30 @@
         }
       });
 
-      $('saveWorkoutBtn').addEventListener('click', () => {
-        const { date, notes, exercises } = getFormState();
-        if (!exercises.length) {
-          alert('Add at least one exercise before saving.');
-          return;
-        }
-        const stats = calcWorkoutStats(exercises);
-        const workout = {
-          id: uuid(),
-          date,
-          notes,
-          exercises,
-          stats,
-          savedAt: new Date().toISOString()
-        };
-        workouts.push(workout);
-        saveWorkouts();
-        alert('Workout saved.');
-        clearDraft();
-      });
+      $('#saveWorkoutBtn').addEventListener('click', () => {
+  const { date, notes, exercises } = getFormState();
+  if (!exercises.length) {
+    alert('Add at least one exercise before saving.');
+    return;
+  }
+
+  const stats = calcWorkoutStats(exercises);
+  const workout = {
+    id: uuid(),
+    date,
+    notes,
+    exercises,
+    stats,
+    savedAt: new Date().toISOString()
+  };
+
+  workouts.push(workout);
+  saveWorkouts();
+  syncWorkoutToSheets(workout);
+  // 🔥 Auto-sync this workout to Google Sheets
+  uploadWorkoutToSheetsAuto();
+});
+
 
       // Diary events
       $('diaryTable').addEventListener('click', e => {
